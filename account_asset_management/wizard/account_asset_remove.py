@@ -17,7 +17,6 @@ class AccountAssetRemove(models.TransientModel):
 
     company_id = fields.Many2one(
         comodel_name="res.company",
-        string="Company",
         readonly=True,
         required=True,
         default=lambda self: self._default_company_id(),
@@ -222,7 +221,7 @@ class AccountAssetRemove(models.TransientModel):
         return {
             "name": self.env._("Asset '%s' Removal Journal Entry", asset_ref),
             "view_mode": "list,form",
-            "views": [(False, "list"), (False, "form")],  # requis par Odoo 20
+            "views": [(False, "list"), (False, "form")],  # required by Odoo 20
             "res_model": "account.move",
             "view_id": False,
             "type": "ir.actions.act_window",
@@ -242,9 +241,11 @@ class AccountAssetRemove(models.TransientModel):
         def _dlines(asset):
             lines = asset.depreciation_line_ids
             dlines = lines.filtered(
-                lambda line: line.type == "depreciate"
-                and not line.init_entry
-                and not line.move_check
+                lambda line: (
+                    line.type == "depreciate"
+                    and not line.init_entry
+                    and not line.move_check
+                )
             )
             dlines = dlines.sorted(key=lambda line: line.line_date)
             return dlines

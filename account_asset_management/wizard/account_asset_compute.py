@@ -44,7 +44,7 @@ class AccountAssetCompute(models.TransientModel):
         return {
             "name": self.env._("Created Asset Moves"),
             "view_mode": "list,form",
-            "views": [(False, "list"), (False, "form")],  # requis par Odoo 20
+            "views": [(False, "list"), (False, "form")],  # required by Odoo 20
             "res_model": "account.move",
             "view_id": False,
             "domain": [("id", "in", created_move_ids)],
@@ -57,7 +57,7 @@ class AccountAssetCompute(models.TransientModel):
         return {
             "name": self.env._("Created Asset Moves"),
             "view_mode": "list,form",
-            "views": [(False, "list"), (False, "form")],  # requis par Odoo 20
+            "views": [(False, "list"), (False, "form")],  # required by Odoo 20
             "res_model": "account.move",
             "view_id": False,
             "domain": domain,

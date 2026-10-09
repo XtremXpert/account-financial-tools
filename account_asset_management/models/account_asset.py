@@ -6,8 +6,6 @@ import calendar
 import logging
 from datetime import date
 from functools import reduce
-from sys import exc_info
-from traceback import format_exception
 
 from dateutil.relativedelta import relativedelta
 
@@ -25,12 +23,12 @@ class DummyFy:
 
 class AccountAsset(models.Model):
     _name = "account.asset"
-    _inherit = ["mail.thread", "mail.activity.mixin", "analytic.mixin"]
+    _inherit = ("mail.thread", "mail.activity.mixin", "analytic.mixin")
     _description = "Asset"
     _order = "date_start desc, code, name"
     _check_company_auto = True
     _check_company_domain = models.check_company_domain_parent_of
-    _rec_names_search = ["code", "name"]
+    _rec_names_search = ("code", "name")
 
     account_move_line_ids = fields.One2many(
         comodel_name="account.move.line",
@@ -131,7 +129,6 @@ class AccountAsset(models.Model):
     active = fields.Boolean(default=True)
     partner_id = fields.Many2one(
         comodel_name="res.partner",
-        string="Partner",
     )
     method = fields.Selection(
         selection=lambda self: self.env["account.asset.profile"]._selection_method(),
@@ -235,7 +232,6 @@ class AccountAsset(models.Model):
     )
     company_id = fields.Many2one(
         comodel_name="res.company",
-        string="Company",
         required=True,
         readonly=True,
         default=lambda self: self._default_company_id(),
@@ -296,8 +292,10 @@ class AccountAsset(models.Model):
     def _compute_depreciation(self):
         for asset in self:
             lines = asset.depreciation_line_ids.filtered(
-                lambda line: line.type in ("depreciate", "remove")
-                and (line.init_entry or line.move_check)
+                lambda line: (
+                    line.type in ("depreciate", "remove")
+                    and (line.init_entry or line.move_check)
+                )
             )
             value_depreciated = sum(line.amount for line in lines)
             residual = asset.depreciation_base - value_depreciated
@@ -386,10 +384,12 @@ class AccountAsset(models.Model):
     @api.constrains("date_start", "method_end", "method_number", "method_time")
     def _check_dates(self):
         if self.filtered(
-            lambda a: a.method_time == "year"
-            and not a.method_number
-            and a.method_end
-            and a.method_end <= a.date_start
+            lambda a: (
+                a.method_time == "year"
+                and not a.method_number
+                and a.method_end
+                and a.method_end <= a.date_start
+            )
         ):
             raise UserError(self.env._("The Start Date must precede the Ending Date."))
 
@@ -486,7 +486,7 @@ class AccountAsset(models.Model):
         for asset in self:
             name = asset.name
             if asset.code:
-                name = " - ".join([asset.code, name])
+                name = f"{asset.code} - {name}"
             asset.display_name = name
 
     def validate(self):
@@ -517,7 +517,7 @@ class AccountAsset(models.Model):
         return {
             "name": self.env._("Generate Asset Removal entries"),
             "view_mode": "form",
-            "views": [(False, "form")],  # requis par Odoo 20
+            "views": [(False, "form")],  # required by Odoo 20
             "res_model": "account.asset.remove",
             "target": "new",
             "type": "ir.actions.act_window",
@@ -535,7 +535,7 @@ class AccountAsset(models.Model):
         return {
             "name": self.env._("Journal Entries"),
             "view_mode": "list,form",
-            "views": [(False, "list"), (False, "form")],  # requis par Odoo 20
+            "views": [(False, "list"), (False, "form")],  # required by Odoo 20
             "res_model": "account.move",
             "view_id": False,
             "type": "ir.actions.act_window",
@@ -828,7 +828,7 @@ class AccountAsset(models.Model):
                     months=self.method_number, days=-1
                 )
             elif self.method_period == "quarter":
-                m = [x for x in [3, 6, 9, 12] if x >= depreciation_start_date.month][0]
+                m = next(x for x in [3, 6, 9, 12] if x >= depreciation_start_date.month)
                 first_line_date = depreciation_start_date + relativedelta(
                     month=m, day=31
                 )
@@ -928,7 +928,7 @@ class AccountAsset(models.Model):
         if self.method_period == "month":
             line_date = start_date + relativedelta(day=31)
         if self.method_period == "quarter":
-            m = [x for x in [3, 6, 9, 12] if x >= start_date.month][0]
+            m = next(x for x in [3, 6, 9, 12] if x >= start_date.month)
             line_date = start_date + relativedelta(month=m, day=31)
         elif self.method_period == "year":
             line_date = table[0]["date_stop"]
@@ -1104,15 +1104,16 @@ class AccountAsset(models.Model):
             # was compensated in the first FY depreciation line.
             # The code has now been simplified with compensation
             # always in last FT depreciation line.
-            if self.method_time == "year" and not entry.get("day_amount"):
-                if not currency.is_zero(fy_amount_check - fy_amount):
-                    diff = fy_amount_check - fy_amount
-                    amount = amount - diff
-                    remaining_value += diff
-                    lines[-1].update(
-                        {"amount": amount, "remaining_value": remaining_value}
-                    )
-                    depreciated_value -= diff
+            if (
+                self.method_time == "year"
+                and not entry.get("day_amount")
+                and not currency.is_zero(fy_amount_check - fy_amount)
+            ):
+                diff = fy_amount_check - fy_amount
+                amount = amount - diff
+                remaining_value += diff
+                lines[-1].update({"amount": amount, "remaining_value": remaining_value})
+                depreciated_value -= diff
 
             if not lines:
                 table.pop(i)
@@ -1209,9 +1210,7 @@ class AccountAsset(models.Model):
             try:
                 with self.env.cr.savepoint():
                     result += depreciation.create_move()
-            except Exception:
-                e = exc_info()[1]
-                tb = "".join(format_exception(*exc_info()))
+            except Exception as e:
                 asset_ref = depreciation.asset_id.name
                 if depreciation.asset_id.code:
                     asset_ref = f"[{depreciation.asset_id.code}] {asset_ref}"
@@ -1219,11 +1218,9 @@ class AccountAsset(models.Model):
                     "\nError while processing asset '%(ref)s': %(exception)s"
                 )
                 error_log += msg_log % {"ref": asset_ref, "exception": str(e)}
-                msg_err = self.env._(
-                    "Error while processing asset '%(ref)s': \n\n%(tb)s"
+                _logger.exception(
+                    "%s, Error while processing asset '%s'", self._name, asset_ref
                 )
-                error_msg = msg_err % {"ref": asset_ref, "tb": tb}
-                _logger.error("%s, %s", self._name, error_msg)
 
         if check_triggers and recomputes:
             companies = recomputes.mapped("company_id")
